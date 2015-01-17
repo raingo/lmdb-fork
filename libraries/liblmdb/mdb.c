@@ -3844,7 +3844,7 @@ mdb_env_map(MDB_env *env, void *addr)
 		if (ftruncate(env->me_fd, env->me_mapsize) < 0)
 			return ErrCode();
 	}
-	env->me_map = mmap(addr, env->me_mapsize, prot, MAP_SHARED,
+	env->me_map = mmap(addr, env->me_mapsize, prot, MAP_PRIVATE, //MAP_SHARED,
 		env->me_fd, 0);
 	if (env->me_map == MAP_FAILED) {
 		env->me_map = NULL;
@@ -4460,7 +4460,7 @@ mdb_env_setup_locks(MDB_env *env, char *lpath, int mode, int *excl)
 		CloseHandle(mh);
 		if (!env->me_txns) goto fail_errno;
 #else
-		void *m = mmap(NULL, rsize, PROT_READ|PROT_WRITE, MAP_SHARED,
+		void *m = mmap(NULL, rsize, PROT_READ|PROT_WRITE, MAP_PRIVATE, // MAP_SHARED,
 			env->me_lfd, 0);
 		if (m == MAP_FAILED) goto fail_errno;
 		env->me_txns = m;
@@ -5995,6 +5995,23 @@ mdb_cursor_get(MDB_cursor *mc, MDB_val *key, MDB_val *data,
 					} else {
 						rc = mdb_node_read(mc->mc_txn, leaf, data);
 					}
+
+#ifdef MADV_DONTNEED
+                    static MDB_val prev_data = {0, NULL};
+                    if (prev_data.mv_data)
+                    {
+                        const size_t page_size = 4096;
+                        const size_t page_mask = page_size - 1;
+                        void *free_begin = (void *) ((size_t)prev_data.mv_data & (~page_mask));
+                        size_t free_len = (prev_data.mv_size + 2 * page_size) & (~page_mask);
+
+                        if (madvise(free_begin, free_len, MADV_DONTNEED) == -1)
+                            fprintf(stderr, "warning: madvise()! %s\n", strerror(errno));
+                    }
+
+                    if (rc == MDB_SUCCESS)
+                        prev_data = *data;
+#endif
 				}
 			}
 		}
