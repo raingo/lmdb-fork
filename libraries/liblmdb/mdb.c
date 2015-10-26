@@ -5998,7 +5998,7 @@ mdb_cursor_get(MDB_cursor *mc, MDB_val *key, MDB_val *data,
 
 #ifdef MADV_DONTNEED
                     static MDB_val prev_data = {0, NULL};
-                    if (prev_data.mv_data)
+                    if (prev_data.mv_data && prev_data.mv_data != data -> mv_data)
                     {
                         const size_t page_size = 4096;
                         const size_t page_mask = page_size - 1;
